@@ -75,7 +75,11 @@ class Dispatcher:
 
     async def _cycle(self, session: AsyncSession, now: datetime, events: list) -> dict[str, int]:
         s = self.ctx.settings
-        searching = list(await session.scalars(select(Ride).where(Ride.status == RideStatus.SEARCHING)))
+        # Lock the searching rides until this cycle commits (PostgreSQL; SQLite ignores it). A ride being
+        # cancelled right now, or matched by another backend instance, is skipped rather than waited for,
+        # so a ride can never be assigned twice or assigned after the rider cancelled it.
+        searching = list(await session.scalars(select(Ride).where(Ride.status == RideStatus.SEARCHING)
+                                               .with_for_update(skip_locked=True)))
         gave_up = await self._give_up_stale(session, searching, now, events)
         rides = {r.id: r for r in searching if r.status is RideStatus.SEARCHING}
         offers = list(await session.scalars(select(RideOffer).where(
