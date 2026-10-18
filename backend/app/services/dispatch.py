@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from matching import MatchingConfig, run_cycle
+from routing import VehicleType
 
 from ..context import AppContext
 from ..models import (
@@ -167,8 +168,17 @@ class Dispatcher:
             if d["status"] == "pinged" and (old is None or old.ride_id != d["riderId"] or old.status not in LIVE):
                 ride = rides[d["riderId"]]
                 session.add(RideOffer(ride_id=ride.id, driver_id=driver_id, created_at=now))
-                events.append((driver_id, "ride:ping", {**ride_summary(ride),
-                                                        "expires_in_s": self.config.ping_timeout_s}))
+                p = profiles[driver_id]
+                dist_m, eta_s = self.ctx.routes.pickup_estimate(
+                    (p.lat, p.lng), (ride.pickup_lat, ride.pickup_lng),
+                    VehicleType(ride.vehicle_type), now,
+                )
+                events.append((driver_id, "ride:ping", {
+                    **ride_summary(ride),
+                    "expires_in_s": self.config.ping_timeout_s,
+                    "pickup_distance_m": dist_m,
+                    "pickup_eta_s": eta_s,
+                }))
 
         return {**result.stats, "no_drivers": gave_up}
 

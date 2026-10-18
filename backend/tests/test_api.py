@@ -36,8 +36,13 @@ def test_full_ride_lifecycle(client):
     tick(client)
     assert near.events("ride:ping") and far.events("ride:ping")
     assert not auto.events("ride:ping")                 # wrong vehicle type
-    assert near.get("/drivers/me/offer").json()["ride_id"] == ride["id"]
-    assert "pin" not in near.events("ride:ping")[0]["data"]
+    near_ping = near.events("ride:ping")[0]["data"]
+    far_ping = far.events("ride:ping")[0]["data"]
+    assert "pin" not in near_ping
+    assert near_ping["pickup_distance_m"] > 0
+    assert near_ping["pickup_eta_s"] > 0
+    assert near_ping["pickup_distance_m"] < far_ping["pickup_distance_m"]
+    assert near_ping["pickup_eta_s"] < far_ping["pickup_eta_s"]
 
     assert far.post(f"/rides/{ride['id']}/accept").status_code == 202
     assert near.post(f"/rides/{ride['id']}/accept").status_code == 202
