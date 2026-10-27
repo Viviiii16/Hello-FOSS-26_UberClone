@@ -205,6 +205,24 @@ def test_admin_approves_pending_driver(make_client):
     assert admin.post(f"/admin/drivers/{d.id}/approve").json()["status"] == "approved"
     assert d.post("/drivers/me/online", {"online": True}).status_code == 200
 
+def test_admin_map_is_admin_only_and_lists_online_drivers(make_client):
+    client = make_client(admin_phones=("+919999999999",))
+    admin = Actor(client, "rider", phone="+919999999999")
+    r = rider(client)
+    d = driver(client, 12.9726, 77.5946)
+
+    assert client.get("/admin/map").status_code == 401      # no token
+    assert r.get("/admin/map").status_code == 403           # normal user
+
+    data = admin.get("/admin/map").json()
+    assert [x["user_id"] for x in data["drivers"]] == [d.id]
+    assert data["drivers"][0]["lat"] == 12.9726
+    assert data["rides"] == []
+
+    ride = book(r)
+    data = admin.get("/admin/map").json()
+    assert [x["id"] for x in data["rides"]] == [ride["id"]]
+
 
 # --------------------------------------------------------------------------- #
 # WebSocket
