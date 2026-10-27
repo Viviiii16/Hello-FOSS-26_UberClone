@@ -40,6 +40,14 @@ class RouteService:
     def has_roads(self) -> bool:
         return self.router is not None
 
+    def pickup_estimate(self, driver: LatLng, pickup: LatLng, vehicle: VehicleType,
+                        at: datetime | None = None) -> tuple[int, int]:
+        """(distance_m, duration_s) from driver to pickup point."""
+        km = haversine_km(driver, pickup) * DETOUR_FACTOR
+        eta = self.pickup_eta.pickup_eta_s(driver, pickup, vehicle, at or datetime.now(timezone.utc))
+        duration_s = int(round(eta)) if eta is not None else int(round(km / STRAIGHT_LINE_SPEED_KMH * 3600))
+        return int(round(km * 1000)), duration_s
+
     def estimate(self, origin: LatLng, dest: LatLng, vehicle: VehicleType,
                  depart_at: datetime | None = None) -> RouteEstimate | None:
         """None = no road route (outside the mapped area, or no legal way for this vehicle)."""
